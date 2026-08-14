@@ -31,6 +31,14 @@ import {
 
 export const name = 'dsh-remote'
 
+/**
+ * Hard dependency: the shell executor (dsh-pwsh-sandbox) has its own inject
+ * chain and may not be registered yet when this plugin's apply would run.
+ * Declaring the injection makes Cordis wait for it before applying, so the
+ * plugin never disables itself with "shell service unavailable".
+ */
+export const inject = ['shell']
+
 /** Shell calls run unconfined: this plugin owns machine-wide network config. */
 const FREEDOM = { mode: 'danger-full-access' as const, workspaceRoot: process.cwd() }
 
@@ -49,6 +57,8 @@ interface ShellLike {
 }
 
 export function apply(ctx: Context): void {
+  // inject: ['shell'] guarantees the service exists here; keep a defensive
+  // check so a future executor swap cannot disable the plugin silently.
   const shell = ctx.get('shell') as ShellLike | undefined
   if (shell === undefined) {
     console.warn('[dsh-remote] shell service unavailable; plugin disabled')
