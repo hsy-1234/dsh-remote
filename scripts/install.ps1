@@ -94,6 +94,20 @@ Copy-Item (Join-Path $cloneDir 'lib/*.d.ts') (Join-Path $dest 'lib/') -Force
 Copy-Item (Join-Path $cloneDir 'package.json') $dest -Force
 Ok 'plugin files deployed'
 
+# ── 4b. verify the deployed layout (flat copies crash the loader) ────────
+$mustExist = @(
+    (Join-Path $dest 'lib/index.js'),
+    (Join-Path $dest 'lib/remote.js'),
+    (Join-Path $dest 'lib/client.js'),
+    (Join-Path $dest 'package.json')
+)
+foreach ($f in $mustExist) {
+    if (-not (Test-Path $f)) {
+        throw "deployment verification failed: $f missing - layout must be node_modules/dsh-remote/lib/*.js (not flat)"
+    }
+}
+Ok 'deployment layout verified (lib/ subdirectory)'
+
 # ── 5. dependency (typert-protocol) into the profile ─────────────────────
 Step 'Installing @deepseek-ai/dsh-typert-protocol into the profile'
 Push-Location $profileDir

@@ -1,6 +1,6 @@
 {
   "name": "dsh-remote",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "type": "module",
   "description": "Remote access manager for the DeepSeek Harness Web UI: LAN + Tailscale status panel, one-click install/login, idempotent patch config.",
   "keywords": [

@@ -162,9 +162,26 @@ npm run build
 #    读取 package.json 前 3 字节：必须是 7B 0A 20（'{' '\n' ' '），
 #    绝不能是 EF BB BF。若是，立即中止并报告"BOM 污染"。
 
-# 4. 部署到 web profile
-#    把 lib/*.js、lib/*.d.ts、package.json 拷贝到：
-#    ~/.dsh/profiles/web/node_modules/dsh-remote/
+# 4. 部署到 web profile（⚠️ 注意目录层级：构建产物必须进 lib/ 子目录）
+#    最终结构必须与 package.json 的 main/exports（./lib/index.js 等）完全一致：
+#
+#     ~/.dsh/profiles/web/node_modules/dsh-remote/
+#     ├── package.json
+#     └── lib/
+#         ├── index.js  remote.js  core.js  client.js
+#         └── index.d.ts  remote.d.ts  core.d.ts
+#
+#    错误示范（产物平铺在包根目录会报 Cannot find module .../lib/index.js）：
+#    ✗  node_modules/dsh-remote/index.js
+#    ✓  node_modules/dsh-remote/lib/index.js
+#
+#    正确执行（PowerShell）：
+New-Item -ItemType Directory -Force -Path "$HOME\.dsh\profiles\web\node_modules\dsh-remote\lib"
+Copy-Item "lib\*.js"  "$HOME\.dsh\profiles\web\node_modules\dsh-remote\lib\" -Force
+Copy-Item "lib\*.d.ts" "$HOME\.dsh\profiles\web\node_modules\dsh-remote\lib\" -Force
+Copy-Item "package.json" "$HOME\.dsh\profiles\web\node_modules\dsh-remote\" -Force
+#    部署后必须验证：
+Test-Path "$HOME\.dsh\profiles\web\node_modules\dsh-remote\lib\index.js"   # 必须为 True
 
 # 5. 安装依赖（必须，否则 dsh-remote-service 无法加载）
 cd ~/.dsh/profiles/web
@@ -383,8 +400,9 @@ test/
 
 | 版本 | 内容 |
 | --- | --- |
-| **v0.0.7** | **当前推荐**：ESM 化（`type: module` + default export，根治 CJS-require-ESM 崩溃）；新增一键安装脚本 `scripts/install.ps1`、BOM 检查脚本、**AI 安装指南** |
-| v0.0.6 | 修复"一键配置"拼接粘行 bug（YAML 解析失败致启动崩溃）；新增回归测试（**已撤回：ESM 崩溃**） |
+| **v0.0.8** | **当前推荐**：AI 安装指南部署步骤精确化（lib/ 子目录层级 + 结构图 + 验证命令）；install.ps1 增加部署后结构验证（防平铺崩溃） |
+| v0.0.7 | ESM 化（`type: module` + default export，根治 CJS-require-ESM 崩溃）；一键安装脚本、BOM 检查脚本、AI 安装指南（**已撤回：文档歧义致平铺部署**） |
+| v0.0.6 | 修复"一键配置"拼接粘行 bug（**已撤回：ESM 崩溃**） |
 | v0.0.5 | 修复 package.json UTF-8 BOM（**已撤回：粘行 bug**） |
 | v0.0.4 | 永久 UI：client bundle 内置侧边栏/面板；webServer 路由 + 自带信任围栏；修复 fs 服务获取（**已撤回：BOM**） |
 | v0.0.3 | 修复 shell 加载时序与配置幂等合并（**已撤回：BOM**） |
