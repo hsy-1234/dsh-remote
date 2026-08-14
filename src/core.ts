@@ -147,9 +147,15 @@ export function buildUrls(
   port: number,
 ): Array<{ kind: string; url: string }> {
   const urls: Array<{ kind: string; url: string }> = []
-  for (const ip of lanIps) urls.push({ kind: 'LAN', url: `http://${ip}:${port}` })
-  if (tailscaleIp) urls.push({ kind: 'Tailscale', url: `http://${tailscaleIp}:${port}` })
-  if (dnsName) urls.push({ kind: 'MagicDNS', url: `http://${dnsName}:${port}` })
+  const seen = new Set<string>()
+  const push = (kind: string, url: string) => {
+    if (seen.has(url)) return
+    seen.add(url)
+    urls.push({ kind, url })
+  }
+  for (const ip of lanIps) push('LAN', `http://${ip}:${port}`)
+  if (tailscaleIp) push('Tailscale', `http://${tailscaleIp}:${port}`)
+  if (dnsName) push('MagicDNS', `http://${dnsName}:${port}`)
   return urls
 }
 

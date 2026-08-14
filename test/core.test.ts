@@ -113,6 +113,13 @@ describe('buildUrls', () => {
       { kind: 'MagicDNS', url: 'http://laptop.tail.ts.net:3080' },
     ])
   })
+  it('deduplicates when the tailscale IP also appears among LAN IPs', () => {
+    const urls = buildUrls(['192.168.3.165', '100.85.33.103'], '100.85.33.103', null, 3080)
+    expect(urls).toEqual([
+      { kind: 'LAN', url: 'http://192.168.3.165:3080' },
+      { kind: 'Tailscale', url: 'http://100.85.33.103:3080' },
+    ])
+  })
 })
 
 describe('findTailscalePrefix', () => {
