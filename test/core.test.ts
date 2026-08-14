@@ -102,6 +102,17 @@ describe('upsertPatchEntries', () => {
     // idempotent: applying again yields the same result
     expect(upsertPatchEntries(out, entries)).toBe(out)
   })
+  it('inserts a line break when the existing file has no trailing newline', () => {
+    // regression: previously the appended block glued onto the last line
+    // (`...remote'- id: webserver`) which made the YAML unparseable
+    const existing = "# comment\n- insert:\n    - id: dsh-remote\n      name: 'dsh-remote'"
+    const entries = [{ id: 'webserver', block: '- id: webserver\n  config:\n    host: 0.0.0.0\n' }]
+    const out = upsertPatchEntries(existing, entries)
+    expect(out).toContain("name: 'dsh-remote'\n- id: webserver")
+    expect(out).not.toContain("dsh-remote'- id: webserver")
+    // and idempotency still holds
+    expect(upsertPatchEntries(out, entries)).toBe(out)
+  })
 })
 
 describe('buildUrls', () => {

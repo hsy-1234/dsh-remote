@@ -136,7 +136,12 @@ export function upsertPatchEntries(
     const m = chunk.match(/^- id: (\S+)/)
     return !m || !ids.has(m[1])
   })
-  return kept.join('') + entries.map((e) => e.block).join('')
+  // Guarantee a line break before the appended entries: an input file whose
+  // last line has no trailing newline would otherwise glue the new block
+  // onto it, producing invalid YAML (e.g. `...remote'- id: webserver`).
+  const base = kept.join('')
+  const sep = base.length > 0 && !base.endsWith('\n') ? '\n' : ''
+  return base + sep + entries.map((e) => e.block).join('')
 }
 
 /** Access URLs offered to the user, LAN first, then Tailscale. */
