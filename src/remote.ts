@@ -424,6 +424,6 @@ class DshRemoteService extends TypertRemoteService {
   }
 }
 
-// Loader-entry form: module.exports IS the plugin class (same shape the
-// shipped @Remote services use), so the Cordis loader instantiates it.
-export = DshRemoteService
+// ESM loader-entry form: the plugin class is the module default export.
+// (ESM avoids the CJS-require-ESM race that crashed dsh under Node 25.)
+export default DshRemoteService
