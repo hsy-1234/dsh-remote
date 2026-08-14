@@ -66,28 +66,44 @@ export function parseTailscaleJson(
 }
 
 /**
- * Build the cordis.patch.yml block this plugin manages. When `authority` is
- * set (a Tailscale IP or MagicDNS name) it is declared on the /api
+ * Build the cordis.patch.yml entries this plugin manages. When `authority`
+ * is set (a Tailscale IP or MagicDNS name) it is declared on the /api
  * browser-trust fence; otherwise the fence keeps the invocation defaults
  * (LAN literals are auto-trusted by dsh when the server binds 0.0.0.0).
  */
-export function buildPatchBlock(authority: string | null, port: number): string {
+export function buildPatchEntries(
+  authority: string | null,
+  port: number,
+): Array<{ id: string; block: string }> {
+  // NOTE: the !!js YAML tag only accepts SCALAR values (dsh-app-boot's
+  // entry-list dialect), so the expression must be a quoted scalar — an
+  // inline flow sequence like `[...]` fails to parse.
   const trustedLine = authority
-    ? `    trustedHosts: !!js [...ctx.webStartup.trustedHosts, '${authority}']`
+    ? `    trustedHosts: !!js "ctx.webStartup.trustedHosts.concat(['${authority}'])"`
     : '    trustedHosts: !!js ctx.webStartup.trustedHosts'
   return [
-    '# Managed by dsh-remote (remote access)',
-    '- id: webserver',
-    '  config:',
-    "    host: '0.0.0.0'",
-    `    port: ${port}`,
-    '- id: web-runtime',
-    '  config:',
-    '    printUrl: true',
-    '    surfaceContext: true',
-    trustedLine,
-    '',
-  ].join('\n')
+    {
+      id: 'webserver',
+      block: [
+        '- id: webserver',
+        '  config:',
+        "    host: '0.0.0.0'",
+        `    port: ${port}`,
+        '',
+      ].join('\n'),
+    },
+    {
+      id: 'web-runtime',
+      block: [
+        '- id: web-runtime',
+        '  config:',
+        '    printUrl: true',
+        '    surfaceContext: true',
+        trustedLine,
+        '',
+      ].join('\n'),
+    },
+  ]
 }
 
 /** Whether the patch already binds the web server to all interfaces. */
@@ -101,14 +117,26 @@ export function hasTrustedAuthority(content: string, authority: string): boolean
 }
 
 /**
- * Merge a managed block into existing patch content: an empty or default
- * (`[]`) file is replaced; anything else keeps its entries and the block is
- * appended to the array.
+ * Merge managed patch entries into existing content with ID-level
+ * idempotency: an empty or default (`[]`) file is replaced; otherwise every
+ * entry whose `- id:` already exists is replaced in place and all other
+ * entries are preserved — repeated calls never accumulate duplicates.
  */
-export function mergePatchContent(existing: string, block: string): string {
+export function upsertPatchEntries(
+  existing: string,
+  entries: ReadonlyArray<{ id: string; block: string }>,
+): string {
   const trimmed = existing.trim()
-  if (trimmed === '' || trimmed === '[]') return block
-  return `${existing.replace(/\s*$/, '\n')}${block}`
+  if (trimmed === '' || trimmed === '[]') {
+    return entries.map((e) => e.block).join('')
+  }
+  const ids = new Set(entries.map((e) => e.id))
+  // Split on entry boundaries: each chunk starts with "- id: ".
+  const kept = existing.split(/^(?=- id: )/m).filter((chunk) => {
+    const m = chunk.match(/^- id: (\S+)/)
+    return !m || !ids.has(m[1])
+  })
+  return kept.join('') + entries.map((e) => e.block).join('')
 }
 
 /** Access URLs offered to the user, LAN first, then Tailscale. */

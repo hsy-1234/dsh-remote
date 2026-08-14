@@ -18,15 +18,15 @@ import process from 'node:process'
 import type { Context } from '@deepseek-ai/cordis'
 import type { CmdResult, TailscaleProbe } from './core.js'
 import {
-  buildPatchBlock,
+  buildPatchEntries,
   buildUrls,
   extractFirstIp,
   findTailscalePrefix,
   hasHostBinding,
   isLoggedInOutput,
-  mergePatchContent,
   parseTailscaleJson,
   tailscaleCommand,
+  upsertPatchEntries,
 } from './core.js'
 
 export const name = 'dsh-remote'
@@ -243,8 +243,8 @@ export function apply(ctx: Context): void {
           if (!path) return { kind: 'error' as const, text: '无法解析 home 目录' }
           const ts = await probeTailscale()
           const authority = ts.loggedIn ? (ts.dnsName ?? ts.ip) : null
-          const block = buildPatchBlock(authority, webInfo().port ?? 3080)
-          const merged = mergePatchContent(await readPatch(path), block)
+          const entries = buildPatchEntries(authority, webInfo().port ?? 3080)
+          const merged = upsertPatchEntries(await readPatch(path), entries)
           await writePatch(path, merged)
           return {
             kind: 'success' as const,

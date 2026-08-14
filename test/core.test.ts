@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildPatchBlock,
+  buildPatchEntries,
   buildUrls,
   extractFirstIp,
   findTailscalePrefix,
   hasHostBinding,
   hasTrustedAuthority,
   isLoggedInOutput,
-  mergePatchContent,
   parseTailscaleJson,
   tailscaleCommand,
+  upsertPatchEntries,
 } from '../src/core.js'
 import type { CmdResult } from '../src/core.js'
 
@@ -54,17 +54,18 @@ describe('parseTailscaleJson', () => {
   })
 })
 
-describe('buildPatchBlock', () => {
+describe('buildPatchEntries', () => {
   it('includes the trust line with an authority', () => {
-    const block = buildPatchBlock('100.85.33.103', 3080)
-    expect(block).toContain("host: '0.0.0.0'")
-    expect(block).toContain('port: 3080')
-    expect(block).toContain("trustedHosts: !!js [...ctx.webStartup.trustedHosts, '100.85.33.103']")
+    const entries = buildPatchEntries('100.85.33.103', 3080)
+    expect(entries.map((e) => e.id)).toEqual(['webserver', 'web-runtime'])
+    expect(entries[0].block).toContain("host: '0.0.0.0'")
+    expect(entries[0].block).toContain('port: 3080')
+    expect(entries[1].block).toContain("trustedHosts: !!js \"ctx.webStartup.trustedHosts.concat(['100.85.33.103'])\"")
   })
   it('omits the authority when not logged in', () => {
-    const block = buildPatchBlock(null, 3080)
-    expect(block).not.toContain('100.85')
-    expect(block).toContain('trustedHosts: !!js ctx.webStartup.trustedHosts')
+    const entries = buildPatchEntries(null, 3080)
+    expect(entries[1].block).not.toContain('100.85')
+    expect(entries[1].block).toContain('trustedHosts: !!js ctx.webStartup.trustedHosts')
   })
 })
 
@@ -80,14 +81,26 @@ describe('hasHostBinding / hasTrustedAuthority', () => {
   })
 })
 
-describe('mergePatchContent', () => {
+describe('upsertPatchEntries', () => {
   it('replaces the empty default file', () => {
-    expect(mergePatchContent('[]', 'BLOCK')).toBe('BLOCK')
-    expect(mergePatchContent('', 'BLOCK')).toBe('BLOCK')
+    const entries = [{ id: 'webserver', block: 'BLOCK-A' }, { id: 'web-runtime', block: 'BLOCK-B' }]
+    expect(upsertPatchEntries('[]', entries)).toBe('BLOCK-ABLOCK-B')
+    expect(upsertPatchEntries('', entries)).toBe('BLOCK-ABLOCK-B')
   })
-  it('appends to an existing patch while keeping entries', () => {
+  it('appends to an existing patch while keeping unrelated entries', () => {
     const existing = '- id: something\n  config:\n    a: 1\n'
-    expect(mergePatchContent(existing, 'BLOCK')).toBe(`${existing}BLOCK`)
+    const entries = [{ id: 'webserver', block: 'BLOCK-A' }]
+    expect(upsertPatchEntries(existing, entries)).toBe(`${existing}BLOCK-A`)
+  })
+  it('replaces matching entries in place instead of duplicating them', () => {
+    const existing = '- id: webserver\n  config:\n    host: 127.0.0.1\n- id: other\n  config:\n    x: 1\n'
+    const entries = [{ id: 'webserver', block: '- id: webserver\n  config:\n    host: 0.0.0.0\n' }]
+    const out = upsertPatchEntries(existing, entries)
+    expect(out).toContain('host: 0.0.0.0')
+    expect(out).not.toContain('127.0.0.1')
+    expect(out).toContain('- id: other')
+    // idempotent: applying again yields the same result
+    expect(upsertPatchEntries(out, entries)).toBe(out)
   })
 })
 
