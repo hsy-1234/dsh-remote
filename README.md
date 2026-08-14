@@ -89,7 +89,10 @@ npm run build     # 产物在 lib/
 - insert:
     - id: dsh-remote
       name: 'dsh-remote'                      # npm 包名
-      # 或本地路径: name: 'C:/path/to/dsh-remote/lib/index.js'
+      # 本地路径（Windows 必须用 file:// URL，裸 C:/ 路径会报 "Received protocol 'c:'"）:
+      # name: 'file:///C:/path/to/dsh-remote/lib/index.js'
+      # Linux/macOS 绝对路径:
+      # name: '/path/to/dsh-remote/lib/index.js'
 ```
 
 重启：
@@ -187,17 +190,25 @@ dsh web
     port: 3080
 
 # 2. 信任围栏：显式声明 Tailscale 地址（LAN 地址由 dsh 自动信任）
+#    ⚠️ !!js 标签只接受标量：必须用 concat() 表达式写法，内联数组会解析失败
 - id: web-runtime
   config:
     printUrl: true
     surfaceContext: true
-    trustedHosts: !!js [...ctx.webStartup.trustedHosts, '100.85.33.103']
+    trustedHosts: !!js "ctx.webStartup.trustedHosts.concat(['100.85.33.103'])"
 
 # 3.（推荐，部署级）默认沙箱模式与 settings.yaml 的权限预设一致
 - id: sandbox-policy
   config:
     mode: !!js process.env.DSH_PERMISSION_MODE ?? 'danger-full-access'
     workspaceRoot: !!js process.cwd()
+
+# 4.（⚠️ 覆盖 sandbox-policy 后必须同时设置）PermissionPresetService 在构造
+#    时读取补丁 config 而非 settings.yaml；不显式设置 defaultPreset 会报
+#    "composed sandbox and approval defaults match no preset"
+- id: permission
+  config:
+    defaultPreset: danger-full-access
 ```
 
 ### 相关概念
