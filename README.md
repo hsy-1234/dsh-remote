@@ -73,7 +73,22 @@
 - Windows 10/11 电脑，已安装 [DeepSeek Harness](https://deepseek-harness.github.io/deepseek-harness/) 并跑过 `dsh web`
 - Node.js ≥ 20（构建插件时需要）
 
-### 方式一：npm 包（推荐，发布后可用）
+### 方式一：一键安装脚本（推荐，v0.0.7+）
+
+```powershell
+# 克隆仓库后运行（或直接下载 scripts/install.ps1）
+.\scripts\install.ps1
+```
+
+脚本自动完成：克隆（锁定最新 tag）→ 依赖安装 → 构建 → 测试 → **BOM 检查** → 部署到 `~/.dsh/profiles/web/node_modules/dsh-remote` → 安装 `@deepseek-ai/dsh-typert-protocol` 依赖 → 注册 `cordis.patch.yml`（幂等，自动备份）→ 提示重启。
+
+```powershell
+# 可选参数
+.\scripts\install.ps1 -Tag v0.0.7     # 指定版本
+.\scripts\install.ps1 -SkipTest        # 跳过测试
+```
+
+### 方式二：npm 包（发布后可用）
 
 ```bash
 npm install dsh-remote
@@ -89,7 +104,7 @@ npm install dsh-remote
       name: 'dsh-remote/remote'
 ```
 
-### 方式二：本地构建
+### 方式三：本地构建
 
 ```bash
 git clone https://github.com/hsy-1234/dsh-remote.git
@@ -119,6 +134,90 @@ npm install @deepseek-ai/dsh-typert-protocol@^0.1.0-rc.6 --legacy-peer-deps
 - 会话右上角出现 **🛰️ 按钮**（带状态灯），右侧出现状态面板
 - 输入 `/remote` 显示文本状态
 - 平板访问 Tailscale 地址不再白屏（polyfill 已注入）
+
+---
+
+## 🤖 AI 安装指南（供自动化 agent 使用）
+
+> 本部分写给**自动化 agent**（没有人工协助的 AI 安装者）。请严格按顺序执行，**每步验证成功后再继续**；任何一步失败都按"常见错误处理"表排查，不要跳过验证。
+
+### 前置检查
+
+1. `dsh --profile web --dump-config` 能正常输出（无 YAML 解析错误）
+2. `git`、`npm`、`node` 可用
+
+### 安装步骤
+
+```bash
+# 1. 克隆并锁定发布版本（永远不要用 main 分支）
+git clone --depth 1 --branch v0.0.7 https://github.com/hsy-1234/dsh-remote.git <temp>/dsh-remote
+cd <temp>/dsh-remote
+
+# 2. 构建
+npm install
+npm run build
+# 验证：lib/index.js、lib/remote.js、lib/client.js 三个文件都必须存在
+
+# 3. BOM 检查（必须，v0.0.3/v0.0.4 曾因此崩溃）
+#    读取 package.json 前 3 字节：必须是 7B 0A 20（'{' '\n' ' '），
+#    绝不能是 EF BB BF。若是，立即中止并报告"BOM 污染"。
+
+# 4. 部署到 web profile
+#    把 lib/*.js、lib/*.d.ts、package.json 拷贝到：
+#    ~/.dsh/profiles/web/node_modules/dsh-remote/
+
+# 5. 安装依赖（必须，否则 dsh-remote-service 无法加载）
+cd ~/.dsh/profiles/web
+npm install @deepseek-ai/dsh-typert-protocol@^0.1.0-rc.6 --legacy-peer-deps
+
+# 6. 注册（必须用包名 'dsh-remote'，不能用 file:// 路径——client bundle 依赖包名解析）
+#    在 ~/.dsh/profiles/web/cordis.patch.yml 追加（若已有 dsh-remote 条目则不要重复）：
+```
+
+```yaml
+- insert:
+    - id: dsh-remote
+      name: 'dsh-remote'
+    - id: dsh-remote-service
+      name: 'dsh-remote/remote'
+```
+
+```bash
+# 7. 验证配置
+dsh --profile web --dump-config   # 应包含 dsh-remote 和 dsh-remote-service 两条 entry
+
+# 8. 重启 dsh web，启动日志必须依次出现：
+#    [dsh-remote] apply start
+#    [dsh-remote] polyfill tap registered
+#    [dsh-remote] commands registered
+#    [dsh-remote] DshRemoteService constructed
+#    [dsh-remote] routes registered
+
+# 9. 验证服务端点（返回 200 + JSON 状态）
+#    POST /dsh-remote/status  （body: {}）
+
+# 10. 验证 UI：浏览器页面右上角出现 🛰️ 按钮（client bundle 加载成功）
+```
+
+### 常见错误处理
+
+| 错误现象 | 根因 | 处理 |
+| --- | --- | --- |
+| `Unexpected token '﻿'`（JSON.parse 崩溃） | package.json 带 UTF-8 BOM | 换用 v0.0.7+（或手动去 BOM） |
+| `Unexpected module status 0` / `Cannot require() ES Module` | CJS 插件 require ESM 依赖（Node 25 并发断言） | 确认是 v0.0.7+（ESM 版）；旧版无法修复 |
+| `bad indentation of a mapping entry`（YAML 解析失败） | 配置拼接粘行（`...remote'- id: webserver`） | 修复 YAML 换行；确认 v0.0.7+ |
+| `dsh-remote-service` 未加载 | 缺 `@deepseek-ai/dsh-typert-protocol` 依赖 | 执行步骤 5 |
+| `/plugins/dsh-remote/client.js` 返回 404 | 用了 `file://` 路径注册 | 改用包名 `'dsh-remote'` 注册 |
+| `shell service unavailable; plugin disabled` | 插件在 shell 执行器就绪前 apply | 确认 v0.0.7+（`inject: ['shell']`） |
+| 启动成功但无 🛰️ 按钮 | client bundle 未发现 | 确认 `cordis.patch.yml` 用包名注册 + 重启 |
+
+### 完成判定（全部满足才算安装成功）
+
+1. `dsh web` 启动无错误
+2. 启动日志包含上述 5 行 `[dsh-remote]` 标记
+3. `POST /dsh-remote/status` 返回 `200` 和 JSON 状态
+4. 浏览器出现 🛰️ 按钮与右侧面板
+5. `/remote` 命令可用
 
 ---
 
@@ -284,7 +383,8 @@ test/
 
 | 版本 | 内容 |
 | --- | --- |
-| **v0.0.6** | **当前推荐**：修复"一键配置"拼接粘行 bug（文件无尾换行时新条目粘到上一行，YAML 解析失败导致启动崩溃）；新增回归测试 |
+| **v0.0.7** | **当前推荐**：ESM 化（`type: module` + default export，根治 CJS-require-ESM 崩溃）；新增一键安装脚本 `scripts/install.ps1`、BOM 检查脚本、**AI 安装指南** |
+| v0.0.6 | 修复"一键配置"拼接粘行 bug（YAML 解析失败致启动崩溃）；新增回归测试（**已撤回：ESM 崩溃**） |
 | v0.0.5 | 修复 package.json UTF-8 BOM（**已撤回：粘行 bug**） |
 | v0.0.4 | 永久 UI：client bundle 内置侧边栏/面板；webServer 路由 + 自带信任围栏；修复 fs 服务获取（**已撤回：BOM**） |
 | v0.0.3 | 修复 shell 加载时序与配置幂等合并（**已撤回：BOM**） |

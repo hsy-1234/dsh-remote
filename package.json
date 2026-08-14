@@ -1,6 +1,6 @@
 {
   "name": "dsh-remote",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "type": "module",
   "description": "Remote access manager for the DeepSeek Harness Web UI: LAN + Tailscale status panel, one-click install/login, idempotent patch config.",
   "keywords": [
@@ -20,7 +20,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node -e \"require('fs').copyFileSync('client/client.js', 'lib/client.js')\"",
     "test": "vitest run",
-    "prepublishOnly": "npm run build && npm test"
+    "check:bom": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-bom.ps1",
+    "prepublishOnly": "npm run check:bom && npm run build && npm test"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1"
