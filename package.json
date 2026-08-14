@@ -1,36 +1,58 @@
-﻿{
-    "name":  "dsh-remote",
-    "version":  "0.0.3",
-    "description":  "Remote access manager for the DeepSeek Harness Web UI: LAN + Tailscale status, one-click patch config, and a model-callable status tool.",
-    "keywords":  [
-                     "deepseek-harness",
-                     "dsh",
-                     "cordis",
-                     "plugin",
-                     "tailscale",
-                     "remote-access"
-                 ],
-    "license":  "MIT",
-    "main":  "lib/index.js",
-    "types":  "lib/index.d.ts",
-    "files":  [
-                  "lib"
-              ],
-    "scripts":  {
-                    "build":  "tsc -p tsconfig.json",
-                    "test":  "vitest run",
-                    "prepublishOnly":  "npm run build \u0026\u0026 npm test"
-                },
-    "peerDependencies":  {
-                             "@deepseek-ai/cordis":  "^4.0.1"
-                         },
-    "devDependencies":  {
-                            "@deepseek-ai/cordis":  "^4.0.1",
-                            "@types/node":  "^22.10.0",
-                            "typescript":  "^5.6.0",
-                            "vitest":  "^3.0.0"
-                        },
-    "engines":  {
-                    "node":  "\u003e=20"
-                }
+{
+    "name": "dsh-remote",
+    "version": "0.0.3",
+    "description": "Remote access manager for the DeepSeek Harness Web UI: LAN + Tailscale status panel, one-click install/login, idempotent patch config.",
+    "keywords": [
+        "deepseek-harness",
+        "dsh",
+        "cordis",
+        "plugin",
+        "tailscale",
+        "remote-access"
+    ],
+    "license": "MIT",
+    "main": "lib/index.js",
+    "types": "lib/index.d.ts",
+    "files": [
+        "lib"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json && node -e \"require('fs').copyFileSync('client/client.js', 'lib/client.js')\"",
+        "test": "vitest run",
+        "prepublishOnly": "npm run build && npm test"
+    },
+    "peerDependencies": {
+        "@deepseek-ai/cordis": "^4.0.1"
+    },
+    "devDependencies": {
+        "@deepseek-ai/cordis": "^4.0.1",
+        "@types/node": "^22.10.0",
+        "typescript": "^5.6.0",
+        "vitest": "^3.0.0"
+    },
+    "dependencies": {
+        "@deepseek-ai/dsh-typert-protocol": "^0.1.0-rc.6"
+    },
+    "exports": {
+        ".": {
+            "types": "./lib/index.d.ts",
+            "default": "./lib/index.js"
+        },
+        "./client": {
+            "default": "./lib/client.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "dsh": {
+        "client": {
+            "inject": [
+                "@deepseek-ai/dsh-client-runtime",
+                "@deepseek-ai/dsh-api-remotes"
+            ],
+            "platform": "web"
+        }
+    },
+    "engines": {
+        "node": ">=20"
+    }
 }

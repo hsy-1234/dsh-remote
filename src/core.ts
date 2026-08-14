@@ -146,17 +146,13 @@ export function buildUrls(
   dnsName: string | null,
   port: number,
 ): Array<{ kind: string; url: string }> {
-  const urls: Array<{ kind: string; url: string }> = []
-  const seen = new Set<string>()
-  const push = (kind: string, url: string) => {
-    if (seen.has(url)) return
-    seen.add(url)
-    urls.push({ kind, url })
-  }
-  for (const ip of lanIps) push('LAN', `http://${ip}:${port}`)
-  if (tailscaleIp) push('Tailscale', `http://${tailscaleIp}:${port}`)
-  if (dnsName) push('MagicDNS', `http://${dnsName}:${port}`)
-  return urls
+  // Map preserves insertion order and later keys override earlier ones, so a
+  // Tailscale IP that also shows up among LAN IPs keeps the Tailscale label.
+  const byUrl = new Map<string, string>()
+  for (const ip of lanIps) byUrl.set(`http://${ip}:${port}`, 'LAN')
+  if (tailscaleIp) byUrl.set(`http://${tailscaleIp}:${port}`, 'Tailscale')
+  if (dnsName) byUrl.set(`http://${dnsName}:${port}`, 'MagicDNS')
+  return [...byUrl.entries()].map(([url, kind]) => ({ kind, url }))
 }
 
 /**
