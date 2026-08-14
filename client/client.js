@@ -2,8 +2,8 @@
 // Copied to lib/client.js at build time; loaded by dsh-client-modules from
 // the package's dsh.client manifest + exports "./client".
 //
-// The remote service (namespace "dshRemote") is provided by the Host half;
-// every UI action funnels through ctx.remote.dshRemote.<method>().
+// The Host half serves /dsh-remote/<method> JSON endpoints (fenced like the
+// /api trust rule); every UI action funnels through a plain fetch.
 
 window.__ModuleLoader__.load({
   id: 'dsh-remote',
@@ -14,13 +14,23 @@ window.__ModuleLoader__.load({
     var React = require('react')
 
     var name = 'dsh-remote'
-    var inject = ['slots', 'remote.dshRemote']
+    var inject = ['slots']
+
+    function callRemote(method, args) {
+      return fetch('/dsh-remote/' + method, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(args || {}),
+      }).then(function (res) {
+        return res.json().catch(function () {
+          return { error: 'HTTP ' + res.status }
+        })
+      })
+    }
 
     function apply(ctx) {
       var slots = ctx.get('slots')
       if (slots === undefined) return
-      var remote = ctx.get('remote.dshRemote')
-      if (remote === undefined) return
 
       // ── shared store ────────────────────────────────────────────────────
       var store = { open: true, status: null, listeners: [] }
@@ -34,7 +44,7 @@ window.__ModuleLoader__.load({
         }, [])
       }
       function refreshStatus() {
-        remote.status().then(function (result) {
+        callRemote('status', {}).then(function (result) {
           store.status = result
           emit()
         }).catch(function (e) {
@@ -46,10 +56,10 @@ window.__ModuleLoader__.load({
       // ── action mapping: UI label -> remote method ───────────────────────
       function callAction(method, label, args) {
         var fn = {
-          'ensure-config': function () { return remote.ensureConfig() },
-          'install-tailscale': function () { return remote.installTailscale() },
-          'login-authkey': function () { return remote.loginAuthkey(args || {}) },
-          'login-gui': function () { return remote.loginGui() },
+          'ensure-config': function () { return callRemote('ensureConfig', {}) },
+          'install-tailscale': function () { return callRemote('installTailscale', {}) },
+          'login-authkey': function () { return callRemote('loginAuthkey', args || {}) },
+          'login-gui': function () { return callRemote('loginGui', {}) },
         }[method]
         return fn ? fn() : Promise.reject(new Error('unknown action ' + method))
       }

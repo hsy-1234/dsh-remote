@@ -1,13 +1,18 @@
 /**
  * dsh-remote — Host-side Remote service.
  *
- * Exposes every plugin capability over the Typert Gateway so the browser
- * client bundle can call it through `ctx.remote.dshRemote.*`. All methods
- * return lossless-JSON payloads.
+ * Exposes every plugin capability over the web server's route registry
+ * (`/dsh-remote/<method>` JSON POST). The gateway's @Remote/srcClaims path
+ * is unreliable across dsh builds, so this plugin owns its transport:
+ * each route enforces a fence equivalent to the /api browser-trust rule
+ * (request Host must be loopback or one of this machine's IPv4 addresses),
+ * which auto-trusts LAN and Tailscale clients exactly like the shipped API.
  */
+import os from 'node:os'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { Context } from '@deepseek-ai/cordis'
-import type { CmdResult, TailscaleProbe } from './core.js'
+import type { ActionResult, CmdResult, StatusPayload, TailscaleProbe } from './core.js'
 import {
   buildPatchEntries,
   buildUrls,
@@ -23,23 +28,51 @@ import {
 /** Shell calls run unconfined: this plugin owns machine-wide network config. */
 const FREEDOM = { mode: 'danger-full-access' as const, workspaceRoot: process.cwd() }
 
-export interface StatusPayload {
-  tailscale: TailscaleProbe
-  web: { host: string | null; port: number | null; lanIps: string[] }
-  config: {
-    patched: boolean
-    trusted: boolean
-    effective: boolean
-    needsRestart: boolean
-    path: string | null
+/** Browser-trust fence for our own routes: loopback or any local IPv4. */
+function hostAllowed(hostHeader: string | undefined): boolean {
+  if (!hostHeader) return false
+  const hostname = hostHeader.split(':')[0].toLowerCase()
+  if (hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '::1' || hostname === '[::1]') return true
+  const interfaces = os.networkInterfaces()
+  for (const addrs of Object.values(interfaces)) {
+    for (const addr of addrs ?? []) {
+      if (addr.family === 'IPv4' && addr.address === hostname) return true
+    }
   }
-  home: string | null
+  return false
 }
 
-export interface ActionResult {
-  ok: boolean
-  message: string
-  needsRestart?: boolean
+/** Collect a bounded JSON request body. */
+function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    let size = 0
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length
+      if (size > 1_000_000) {
+        reject(new Error('body too large'))
+        req.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
+    req.on('end', () => {
+      try {
+        resolve(chunks.length === 0 ? {} : JSON.parse(Buffer.concat(chunks).toString('utf8')))
+      } catch (error) {
+        reject(error)
+      }
+    })
+    req.on('error', reject)
+  })
+}
+
+interface WebServerLike {
+  register(route: {
+    kind: 'exact'
+    path: string
+    handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
+  }): unknown
 }
 
 interface ShellLike {
@@ -62,14 +95,65 @@ interface FsLike {
   writeText(target: unknown, content: string): Promise<unknown>
 }
 
-export class DshRemoteService extends TypertRemoteService {
-  private readonly shell: ShellLike
+class DshRemoteService extends TypertRemoteService {  private readonly shell: ShellLike
   private tsPrefix: string | null = null
   private tsProbeDone = false
 
+  /** Routes need the web server; wait for it before constructing. */
+  static inject = ['webServer']
+
   constructor(ctx: Context, private readonly fs: FsLike | undefined) {
     super(ctx, 'dshRemote')
+    console.log('[dsh-remote] DshRemoteService constructed')
     this.shell = ctx.get('shell') as ShellLike
+    const webServer = ctx.get('webServer') as WebServerLike | undefined
+    if (webServer !== undefined) this.registerRoutes(webServer)
+  }
+
+  // ── HTTP routes: /dsh-remote/<method> with the browser-trust fence ────
+  registerRoutes(webServer: WebServerLike): void {
+    const methods: Array<{ path: string; handle: (args: unknown) => Promise<unknown> }> = [
+      { path: '/dsh-remote/status', handle: () => this.status() },
+      { path: '/dsh-remote/ensureConfig', handle: () => this.ensureConfig() },
+      { path: '/dsh-remote/installTailscale', handle: () => this.installTailscale() },
+      { path: '/dsh-remote/loginAuthkey', handle: (args) => this.loginAuthkey(args as { authkey?: string }) },
+      { path: '/dsh-remote/loginGui', handle: () => this.loginGui() },
+    ]
+    for (const m of methods) {
+      webServer.register({
+        kind: 'exact',
+        path: m.path,
+        handler: async (req, res) => {
+          if (!hostAllowed(req.headers.host)) {
+            res.writeHead(403, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'forbidden' }))
+            return
+          }
+          if (req.method !== 'POST') {
+            res.writeHead(405, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'method not allowed' }))
+            return
+          }
+          let args: unknown
+          try {
+            args = await readJsonBody(req)
+          } catch (error) {
+            res.writeHead(400, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: String(error) }))
+            return
+          }
+          try {
+            const value = await m.handle(args)
+            res.writeHead(200, { 'content-type': 'application/json' })
+            res.end(JSON.stringify(value))
+          } catch (error) {
+            res.writeHead(500, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: String(error) }))
+          }
+        },
+      })
+    }
+    console.log('[dsh-remote] routes registered')
   }
 
   // ── shell helpers ─────────────────────────────────────────────────────
@@ -336,3 +420,7 @@ export class DshRemoteService extends TypertRemoteService {
     }
   }
 }
+
+// Loader-entry form: module.exports IS the plugin class (same shape the
+// shipped @Remote services use), so the Cordis loader instantiates it.
+export = DshRemoteService

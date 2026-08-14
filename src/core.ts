@@ -177,3 +177,24 @@ export function tailscaleCommand(prefix: string | null, sub: string): string {
   if (prefix === null || prefix === '') return `tailscale ${sub}`
   return `& '${prefix}' ${sub}`
 }
+
+// ── Remote service wire types (shared with the client bundle) ────────────
+
+export interface StatusPayload {
+  tailscale: TailscaleProbe
+  web: { host: string | null; port: number | null; lanIps: string[] }
+  config: {
+    patched: boolean
+    trusted: boolean
+    effective: boolean
+    needsRestart: boolean
+    path: string | null
+  }
+  home: string | null
+}
+
+export interface ActionResult {
+  ok: boolean
+  message: string
+  needsRestart?: boolean
+}

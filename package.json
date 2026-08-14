@@ -38,6 +38,9 @@
             "types": "./lib/index.d.ts",
             "default": "./lib/index.js"
         },
+        "./remote": {
+            "default": "./lib/remote.js"
+        },
         "./client": {
             "default": "./lib/client.js"
         },
