@@ -245,7 +245,7 @@ npm install @deepseek-ai/dsh-typert-protocol@^0.1.0-rc.6 --legacy-peer-deps
 A：旧 WebKit 缺 `crypto.randomUUID`，前端初始化崩溃。插件已自动注入 polyfill；若仍异常请**清除浏览器缓存**后重开（Safari：设置 → Safari → 清除历史记录与网站数据）。
 
 **Q：面板显示"fs service unavailable"？**
-A：确认使用 v0.0.4+（服务从 ctx 获取 fs）。重启 dsh web 后自动解决。
+A：确认使用 **v0.0.5**（唯一可用版本；服务从 ctx 获取 fs）。重启 dsh web 后自动解决。
 
 **Q：面板显示"Tailscale 未安装"但明明装好了？**
 A：tailscale 不在标准位置且不在 PATH。插件探测 `D:\Tailscale`、`Program Files` 等位置；装在别处请加入 PATH 或反馈 issue。
@@ -264,7 +264,7 @@ A：工作区数据共享（同一后端），但**每台设备的浏览状态�
 npm install
 npm test          # vitest 单元测试（core 纯逻辑，21 个用例）
 npm run build     # tsc 编译 host 到 lib/ + 拷贝 client bundle
-npm pack          # 生成发布 tarball（dsh-remote-0.0.4.tgz）
+npm pack          # 生成发布 tarball（dsh-remote-0.0.5.tgz）
 ```
 
 ```
@@ -284,8 +284,9 @@ test/
 
 | 版本 | 内容 |
 | --- | --- |
-| v0.0.4 | **永久 UI**：client bundle 内置侧边栏/面板；webServer 路由 + 自带信任围栏；修复 fs 服务获取 |
-| v0.0.3 | 修复 shell 加载时序（`inject: ['shell']`）与配置幂等合并 |
+| **v0.0.5** | **唯一可用版本**：修复 package.json UTF-8 BOM（旧版克隆安装会导致 dsh 启动崩溃）；包格式规范化 |
+| v0.0.4 | 永久 UI：client bundle 内置侧边栏/面板；webServer 路由 + 自带信任围栏；修复 fs 服务获取（**已撤回：BOM**） |
+| v0.0.3 | 修复 shell 加载时序与配置幂等合并（**已撤回：BOM**） |
 | v0.0.1 ~ 0.0.2 | 已撤回（配置解析 bug） |
 
 ## 📄 License
