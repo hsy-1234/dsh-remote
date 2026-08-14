@@ -95,17 +95,20 @@ interface FsLike {
   writeText(target: unknown, content: string): Promise<unknown>
 }
 
-class DshRemoteService extends TypertRemoteService {  private readonly shell: ShellLike
+class DshRemoteService extends TypertRemoteService {
+  private readonly shell: ShellLike
+  private fs: FsLike | undefined
   private tsPrefix: string | null = null
   private tsProbeDone = false
 
-  /** Routes need the web server; wait for it before constructing. */
-  static inject = ['webServer']
+  /** Routes need the web server; the fs service backs patch reads/writes. */
+  static inject = ['webServer', 'fs']
 
-  constructor(ctx: Context, private readonly fs: FsLike | undefined) {
+  constructor(ctx: Context, _config?: unknown) {
     super(ctx, 'dshRemote')
     console.log('[dsh-remote] DshRemoteService constructed')
     this.shell = ctx.get('shell') as ShellLike
+    this.fs = ctx.get('fs') as FsLike | undefined
     const webServer = ctx.get('webServer') as WebServerLike | undefined
     if (webServer !== undefined) this.registerRoutes(webServer)
   }
