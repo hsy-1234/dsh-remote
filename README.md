@@ -68,27 +68,33 @@
 
 ## 📦 安装
 
-### 前置条件
+### ⭐ 强烈推荐：交给 AI 安装
 
-- Windows 10/11 电脑，已安装 [DeepSeek Harness](https://deepseek-harness.github.io/deepseek-harness/) 并跑过 `dsh web`
-- Node.js ≥ 20（构建插件时需要）
+复制下面这句话，发给任意 AI 助手（或你正在使用的 agent）：
 
-### 方式一：一键安装脚本（推荐，v0.0.7+）
+> **https://github.com/hsy-1234/dsh-remote，安装这个插件到harness**
+
+AI 会参考仓库自带的 **🤖 AI 安装指南**（下方章节）自动完成：克隆 → 构建 → BOM 检查 → 部署到 profile → 安装依赖 → 注册配置 → 提示重启。这是**经过三轮"陌生 AI"实测**验证的路径，比手动安装更不容易出错。
+
+### 手动安装（高级选项）
+
+#### 方式一：一键安装脚本
 
 ```powershell
-# 克隆仓库后运行（或直接下载 scripts/install.ps1）
+git clone https://github.com/hsy-1234/dsh-remote.git
+cd dsh-remote
 .\scripts\install.ps1
 ```
 
-脚本自动完成：克隆（锁定最新 tag）→ 依赖安装 → 构建 → 测试 → **BOM 检查** → 部署到 `~/.dsh/profiles/web/node_modules/dsh-remote` → 安装 `@deepseek-ai/dsh-typert-protocol` 依赖 → 注册 `cordis.patch.yml`（幂等，自动备份）→ 提示重启。
+脚本自动完成：克隆（锁定最新发布 tag）→ 依赖安装 → 构建 → 测试 → **BOM 检查** → 部署到 `~/.dsh/profiles/web/node_modules/dsh-remote` → 安装 `@deepseek-ai/dsh-typert-protocol` 依赖 → 注册 `cordis.patch.yml`（幂等，自动备份）→ **部署后结构验证** → 提示重启。
 
 ```powershell
 # 可选参数
-.\scripts\install.ps1 -Tag v0.0.7     # 指定版本
-.\scripts\install.ps1 -SkipTest        # 跳过测试
+.\scripts\install.ps1 -Tag <最新发布tag>   # 指定版本
+.\scripts\install.ps1 -SkipTest            # 跳过测试
 ```
 
-### 方式二：npm 包（发布后可用）
+#### 方式二：npm 包（发布后可用）
 
 ```bash
 npm install dsh-remote
@@ -104,7 +110,7 @@ npm install dsh-remote
       name: 'dsh-remote/remote'
 ```
 
-### 方式三：本地构建
+#### 方式三：本地构建
 
 ```bash
 git clone https://github.com/hsy-1234/dsh-remote.git
@@ -150,7 +156,7 @@ npm install @deepseek-ai/dsh-typert-protocol@^0.1.0-rc.6 --legacy-peer-deps
 
 ```bash
 # 1. 克隆并锁定发布版本（永远不要用 main 分支）
-git clone --depth 1 --branch v0.0.7 https://github.com/hsy-1234/dsh-remote.git <temp>/dsh-remote
+git clone --depth 1 --branch v0.0.8 https://github.com/hsy-1234/dsh-remote.git <temp>/dsh-remote
 cd <temp>/dsh-remote
 
 # 2. 构建
@@ -220,12 +226,12 @@ dsh --profile web --dump-config   # 应包含 dsh-remote 和 dsh-remote-service 
 
 | 错误现象 | 根因 | 处理 |
 | --- | --- | --- |
-| `Unexpected token '﻿'`（JSON.parse 崩溃） | package.json 带 UTF-8 BOM | 换用 v0.0.7+（或手动去 BOM） |
-| `Unexpected module status 0` / `Cannot require() ES Module` | CJS 插件 require ESM 依赖（Node 25 并发断言） | 确认是 v0.0.7+（ESM 版）；旧版无法修复 |
-| `bad indentation of a mapping entry`（YAML 解析失败） | 配置拼接粘行（`...remote'- id: webserver`） | 修复 YAML 换行；确认 v0.0.7+ |
+| `Unexpected token '﻿'`（JSON.parse 崩溃） | package.json 带 UTF-8 BOM | 换用最新发布版（或手动去 BOM） |
+| `Unexpected module status 0` / `Cannot require() ES Module` | CJS 插件 require ESM 依赖（Node 25 并发断言） | 确认是最新发布版（ESM 版）；旧版无法修复 |
+| `bad indentation of a mapping entry`（YAML 解析失败） | 配置拼接粘行（`...remote'- id: webserver`） | 修复 YAML 换行；确认最新发布版 |
 | `dsh-remote-service` 未加载 | 缺 `@deepseek-ai/dsh-typert-protocol` 依赖 | 执行步骤 5 |
 | `/plugins/dsh-remote/client.js` 返回 404 | 用了 `file://` 路径注册 | 改用包名 `'dsh-remote'` 注册 |
-| `shell service unavailable; plugin disabled` | 插件在 shell 执行器就绪前 apply | 确认 v0.0.7+（`inject: ['shell']`） |
+| `shell service unavailable; plugin disabled` | 插件在 shell 执行器就绪前 apply | 确认最新发布版（`inject: ['shell']`） |
 | 启动成功但无 🛰️ 按钮 | client bundle 未发现 | 确认 `cordis.patch.yml` 用包名注册 + 重启 |
 
 ### 完成判定（全部满足才算安装成功）
@@ -361,7 +367,7 @@ dsh --profile web --dump-config   # 应包含 dsh-remote 和 dsh-remote-service 
 A：旧 WebKit 缺 `crypto.randomUUID`，前端初始化崩溃。插件已自动注入 polyfill；若仍异常请**清除浏览器缓存**后重开（Safari：设置 → Safari → 清除历史记录与网站数据）。
 
 **Q：面板显示"fs service unavailable"？**
-A：确认使用 **v0.0.5**（唯一可用版本；服务从 ctx 获取 fs）。重启 dsh web 后自动解决。
+A：确认使用**最新发布版**（服务从 ctx 获取 fs）。重启 dsh web 后自动解决。
 
 **Q：面板显示"Tailscale 未安装"但明明装好了？**
 A：tailscale 不在标准位置且不在 PATH。插件探测 `D:\Tailscale`、`Program Files` 等位置；装在别处请加入 PATH 或反馈 issue。
@@ -380,7 +386,7 @@ A：工作区数据共享（同一后端），但**每台设备的浏览状态�
 npm install
 npm test          # vitest 单元测试（core 纯逻辑，21 个用例）
 npm run build     # tsc 编译 host 到 lib/ + 拷贝 client bundle
-npm pack          # 生成发布 tarball（dsh-remote-0.0.5.tgz）
+npm pack          # 生成发布 tarball（dsh-remote-<version>.tgz）
 ```
 
 ```
@@ -395,18 +401,6 @@ test/
 ```
 
 ---
-
-## 📄 版本历史
-
-| 版本 | 内容 |
-| --- | --- |
-| **v0.0.8** | **当前推荐**：AI 安装指南部署步骤精确化（lib/ 子目录层级 + 结构图 + 验证命令）；install.ps1 增加部署后结构验证（防平铺崩溃） |
-| v0.0.7 | ESM 化（`type: module` + default export，根治 CJS-require-ESM 崩溃）；一键安装脚本、BOM 检查脚本、AI 安装指南（**已撤回：文档歧义致平铺部署**） |
-| v0.0.6 | 修复"一键配置"拼接粘行 bug（**已撤回：ESM 崩溃**） |
-| v0.0.5 | 修复 package.json UTF-8 BOM（**已撤回：粘行 bug**） |
-| v0.0.4 | 永久 UI：client bundle 内置侧边栏/面板；webServer 路由 + 自带信任围栏；修复 fs 服务获取（**已撤回：BOM**） |
-| v0.0.3 | 修复 shell 加载时序与配置幂等合并（**已撤回：BOM**） |
-| v0.0.1 ~ 0.0.2 | 已撤回（配置解析 bug） |
 
 ## 📄 License
 
