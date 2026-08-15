@@ -244,6 +244,52 @@ dsh --profile web --dump-config   # 应包含 dsh-remote 和 dsh-remote-service 
 
 ---
 
+## 📱 Tailscale 安装指南（还没装的话先看这里）
+
+Tailscale 是一个**零配置的私有组网工具**：电脑和你的平板/手机装上它、登录**同一个账号**后，它们就像在同一个局域网里——即使你人在外面，平板也能直接访问电脑上的 Harness Web UI（走加密隧道，不向公网开放任何端口）。
+
+### 第 1 步：电脑端（Windows）
+
+1. 打开 https://tailscale.com/download 下载 Windows 版
+2. 运行安装包，**在弹出的 UAC 确认框点"是"**
+3. 安装完成后，托盘区会出现 Tailscale 图标，首次运行会自动打开登录页
+4. 用你的账号登录（支持 Google / GitHub / Microsoft / 邮箱注册）
+5. 登录成功后，托盘图标变绿，任务栏提示已连接
+
+> 💡 如果已经装好了 dsh-remote 插件，也可以直接用面板的 **"⬇️ 自动安装 Tailscale"** 一键完成安装（只弹一次 UAC）。
+
+### 第 2 步：平板/手机端
+
+| 设备 | 安装方式 |
+| --- | --- |
+| iPad / iPhone | App Store 搜索 **Tailscale** 并安装 |
+| Android | Google Play（或国内应用商店）搜索 **Tailscale** 并安装 |
+
+安装后打开 App，**登录与电脑相同的账号**（同一个 Tailscale 账号，或同一 Google/Apple 账号授权）。
+
+### 第 3 步：验证
+
+- 电脑上打开终端运行 `tailscale status`，应能看到类似输出：
+
+```
+100.85.33.103  laptop-xxxx  yourname@  windows  -
+100.66.107.54 ipad-xxxx    yourname@  iOS      -
+```
+
+- 你的平板应该出现在设备列表里（表示两台设备已组网）
+- 打开插件的 🛰️ 面板，四格状态中的"Tailscale 已安装 / 已登录"应为 ✅
+
+### 常见问题
+
+| 问题 | 处理 |
+| --- | --- |
+| 平板设备显示 `offline` | 打开平板上的 Tailscale App 确认已连接（开关为开） |
+| 登录时卡在浏览器授权 | 授权页在任意设备浏览器打开都可以，登录后回 App 即可 |
+| 电脑休眠后平板连不上 | 保持电脑不休眠（电源设置里关闭"睡眠"），并确保 Tailscale 客户端在运行 |
+| 忘记账号 | 登录页选择"忘记密码"，或换一个账号重新注册（Tailscale 免费版 100 台设备） |
+
+---
+
 ## 🚀 快速开始（3 分钟从零到平板）
 
 **第 1 分钟：安装插件**（见上文）并重启 `dsh web`。
